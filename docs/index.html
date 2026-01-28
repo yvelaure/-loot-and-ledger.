@@ -7,43 +7,48 @@
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser-arcade-physics.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --gold: #ffd700; --xp: #3498db; --bg: #0f0f0f; --panel: rgba(20, 20, 20, 0.9); }
-        body { margin: 0; background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; transition: background 0.5s; }
+        :root { --gold: #ffd700; --panel: rgba(15, 15, 15, 0.95); }
+        body { margin: 0; background: #0a0a0a; color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
         
-        /* THE VISIBILITY FIX: Forces game behind UI */
-        #game-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        /* LAYERING FIX: Game stays behind UI */
+        #game-container { position: absolute; inset: 0; z-index: 1; }
         #ui-layer { position: relative; z-index: 10; pointer-events: none; height: 100vh; }
 
-        /* RAID WARNING EFFECT */
-        .raid-active { animation: raid-flash 0.8s infinite; }
-        @keyframes raid-flash { 0% { background: #0f0f0f; } 50% { background: #450000; } }
-
-        .glass-panel { background: var(--panel); padding: 12px; border-radius: 12px; border: 1px solid #333; pointer-events: auto; backdrop-filter: blur(8px); margin-bottom: 8px; }
+        /* HUD STYLING */
+        .glass { background: var(--panel); padding: 12px; border-radius: 12px; border: 1px solid #333; pointer-events: auto; backdrop-filter: blur(5px); }
         #hud { position: absolute; top: 50px; left: 10px; width: 240px; }
-        
         .btn { padding: 10px; cursor: pointer; border-radius: 8px; border: none; font-weight: bold; background: var(--gold); color: black; width: 100%; margin-top: 5px; pointer-events: auto; }
-        input { display: block; width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; background: #000; color: white; border: 1px solid #444; box-sizing: border-box; }
         
-        #defense-msg { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); background: #ff4757; color: white; padding: 10px 20px; border-radius: 20px; font-weight: bold; display: none; z-index: 100; border: 2px solid white; }
-
-        #chat-box { position: absolute; bottom: 10px; left: 10px; right: 10px; height: 150px; display: flex; flex-direction: column; pointer-events: auto; }
-        #messages { flex: 1; overflow-y: auto; background: var(--panel); padding: 8px; font-size: 12px; border-radius: 12px 12px 0 0; }
+        /* DYNAMIC OVERLAYS */
+        #defense-msg { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); background: #ff4757; padding: 10px 20px; border-radius: 20px; font-weight: bold; display: none; z-index: 100; border: 2px solid white; }
+        #market-crash { position: fixed; inset: 0; background: rgba(255, 0, 0, 0.4); display: none; z-index: 200; align-items: center; justify-content: center; flex-direction: column; pointer-events: auto; }
+        
+        /* CHAT */
+        #chat-box { position: absolute; bottom: 10px; left: 10px; right: 10px; height: 160px; display: flex; flex-direction: column; pointer-events: auto; }
+        #messages { flex: 1; overflow-y: auto; background: var(--panel); padding: 8px; font-size: 11px; border-radius: 12px 12px 0 0; border: 1px solid #333; }
         #chat-input { background: #000; border: 1px solid #333; color: white; padding: 12px; border-radius: 0 0 12px 12px; outline: none; }
 
-        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 9000; display: flex; align-items: center; justify-content: center; pointer-events: auto; }
-        .card { background: #1a1a1a; padding: 25px; border-radius: 20px; border: 1px solid var(--gold); text-align: center; width: 280px; }
+        /* BOSS UI */
+        #boss-ui { position: fixed; top: 60px; left: 50%; transform: translateX(-50%); width: 200px; display: none; text-align: center; }
+        #boss-bar { background: #222; height: 10px; border-radius: 5px; border: 1px solid white; overflow: hidden; }
+        #boss-fill { background: #ff4757; width: 100%; height: 100%; }
+
+        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 9000; display: flex; align-items: center; justify-content: center; pointer-events: auto; }
+        .card { background: #1a1a1a; padding: 30px; border-radius: 20px; border: 1px solid var(--gold); text-align: center; }
+        input[type="text"] { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #444; background: #000; color: white; }
     </style>
 </head>
 <body>
 
-    <div id="defense-msg">⚔️ RAIDERS SPOTTED! DEFEND YOUR VILLAGE!</div>
+    <div id="defense-msg">⚔️ RAIDERS INCOMING!</div>
+    <div id="market-crash"><h1>⚠️ MARKET CRASH</h1><p>TAP REPEATEDLY TO SAVE YOUR GOLD!</p></div>
 
     <div id="auth-screen" class="overlay">
         <div class="card">
             <h1 style="color:var(--gold)">LOOT & LEDGER</h1>
-            <p style="font-size: 12px; opacity: 0.7;">Enter a Realm Name (Bypasses Email Limits)</p>
+            <p style="font-size: 12px; opacity: 0.8;">Enter a Realm Name to Join Multiplayer</p>
             <input type="text" id="username" placeholder="Empire Name">
-            <button class="btn" onclick="startGuestGame()">Start Conquest</button>
+            <button class="btn" onclick="startGuestGame()">Enter the Realm</button>
         </div>
     </div>
 
@@ -51,22 +56,26 @@
 
     <div id="ui-layer">
         <div id="hud">
-            <div class="glass-panel">
-                <div style="font-size:11px">Lvl <span id="lvl">1</span> | Kills: <span id="stat-kills">0</span></div>
-                <div style="font-size: 18px; margin: 4px 0;">Gold: <b id="gold">0</b></div>
-                <div style="font-size: 10px; color: var(--gold);">Structures: <span id="b-total">0</span></div>
+            <div class="glass">
+                <div style="font-size:11px">Level <span id="lvl">1</span> | Kills: <span id="stat-kills">0</span></div>
+                <div style="font-size: 18px; margin: 5px 0;">Gold: <b id="gold">0</b></div>
+                <div style="font-size: 10px; opacity: 0.7;">Structures: <span id="b-total">0</span></div>
             </div>
-            <div class="glass-panel">
-                <button class="btn" onclick="buyItem('farm', 50, 0.01, 15)">🌾 Farm (50G)</button>
-                <button class="btn" onclick="buyItem('bank', 500, 0.08, 60)">🏦 Bank (500G)</button>
-                <button id="demolish-btn" class="btn" style="background:#ff4757; color:white;" onclick="toggleDemolish()">🔨 Demolish: OFF</button>
-                <button class="btn" onclick="claimDaily()" style="background:#00ffcc; color:black;">🎁 Daily Bonus</button>
+            <div class="glass" style="margin-top:10px">
+                <button class="btn" onclick="buyItem('farm', 50, 0.01)">🌾 Farm (50G)</button>
+                <button class="btn" onclick="buyItem('bank', 500, 0.08)">🏦 Bank (500G)</button>
+                <button class="btn" onclick="toggleDemolish()" style="background:#ff4757; color:white;">🔨 Demolish</button>
             </div>
+        </div>
+
+        <div id="boss-ui">
+            <div style="color:#ff4757; font-weight:bold; font-size:12px">WORLD BOSS</div>
+            <div id="boss-bar"><div id="boss-fill"></div></div>
         </div>
 
         <div id="chat-box">
             <div id="messages"></div>
-            <input type="text" id="chat-input" placeholder="Communicate with other rulers...">
+            <input type="text" id="chat-input" placeholder="Chat or /trade [name] [amt]">
         </div>
     </div>
 
