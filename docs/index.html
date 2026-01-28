@@ -2,54 +2,56 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Loot & Ledger | Pro</title>
+    <title>Loot & Ledger | Empire Builder</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser-arcade-physics.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { margin: 0; background: #1a1a1a; color: white; font-family: sans-serif; overflow: hidden; }
+        body { margin: 0; background: #1a1a1a; color: white; font-family: sans-serif; overflow: hidden; touch-action: none; }
         #auth-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .auth-card { background: #2d2d2d; padding: 40px; border-radius: 20px; border: 2px solid #ffd700; text-align: center; }
-        input { display: block; width: 280px; padding: 12px; margin: 12px 0; border-radius: 8px; border: none; background: #444; color: white; }
-        .btn { padding: 10px 20px; cursor: pointer; border-radius: 8px; border: none; font-weight: bold; transition: 0.2s; }
-        .btn-gold { background: #ffd700; color: black; }
-        #ui { position: absolute; top: 20px; left: 20px; z-index: 10; pointer-events: none; display: flex; flex-direction: column; gap: 10px; }
-        .stat-card { background: rgba(0,0,0,0.85); padding: 15px; border-radius: 12px; border: 1px solid #00ff00; pointer-events: auto; width: 250px; }
-        #marketplace { background: rgba(0,0,0,0.85); padding: 15px; border-radius: 12px; border: 1px solid #1da1f2; width: 250px; pointer-events: auto; }
-        .shop-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 5px; background: #333; border-radius: 5px; font-size: 13px; }
-        #logout-btn { position: absolute; top: 20px; right: 20px; z-index: 100; pointer-events: auto; background: #ff4757; color: white; }
+        .auth-card { background: #2d2d2d; padding: 30px; border-radius: 15px; border: 2px solid #ffd700; text-align: center; }
+        input { display: block; width: 250px; padding: 10px; margin: 10px 0; border-radius: 5px; border: none; background: #444; color: white; }
+        .btn { padding: 10px 15px; cursor: pointer; border-radius: 8px; border: none; font-weight: bold; }
+        #ui { position: absolute; top: 10px; left: 10px; z-index: 10; pointer-events: none; display: flex; flex-direction: column; gap: 8px; }
+        .panel { background: rgba(0,0,0,0.8); padding: 12px; border-radius: 10px; pointer-events: auto; width: 230px; border: 1px solid #555; }
+        .shop-btn { background: #ffd700; color: black; padding: 5px; font-size: 11px; border-radius: 4px; border: none; font-weight: bold; cursor: pointer; }
+        #logout-btn { position: absolute; top: 10px; right: 10px; z-index: 100; pointer-events: auto; background: #ff4757; color: white; }
     </style>
 </head>
 <body>
-
     <div id="auth-overlay">
         <div class="auth-card">
             <h1 style="color:#ffd700">Loot & Ledger</h1>
-            <input type="text" id="username" placeholder="Display Name">
-            <input type="email" id="email" placeholder="Email Address">
+            <input type="text" id="username" placeholder="Ruler Name">
+            <input type="email" id="email" placeholder="Email">
             <input type="password" id="password" placeholder="Password">
-            <button class="btn btn-gold" onclick="handleAuth('signup')">Create Account</button>
-            <button class="btn" onclick="handleAuth('login')" style="background:white; margin-top:10px">Login</button>
+            <button class="btn" style="background:#ffd700" onclick="handleAuth('signup')">Found Empire</button>
+            <button class="btn" style="background:white; margin-top:5px" onclick="handleAuth('login')">Login</button>
         </div>
     </div>
-
     <button id="logout-btn" class="btn" style="display:none;" onclick="handleLogout()">Logout</button>
-
     <div id="ui">
-        <div class="stat-card">
-            <div style="font-size: 24px;">Treasury: <span id="gold-display" style="color:#ffd700">100</span>G</div>
-            <div style="font-size: 14px; opacity: 0.8;">Avg Interest: <span id="rate-display">5</span>%</div>
+        <div class="panel" style="border-color:#00ff00">
+            <div style="font-size: 20px;">Gold: <span id="gold-display" style="color:#ffd700">0</span></div>
+            <div style="font-size: 12px; opacity:0.7;">Interest: <span id="rate-display">5</span>%</div>
+            <p style="font-size: 10px; margin: 5px 0 0 0;">Tap screen to mine +1G!</p>
         </div>
-
-        <div id="marketplace">
-            <h3 style="margin:0 0 10px 0; color:#1da1f2; text-align:center;">🏛️ Building Market</h3>
-            <div class="shop-item"><span>Farm (+1%)</span><button class="btn btn-gold" onclick="buyItem('farm', 50, 0.01)">50G</button></div>
-            <div class="shop-item"><span>Market (+3%)</span><button class="btn btn-gold" onclick="buyItem('market', 150, 0.03)">150G</button></div>
-            <div class="shop-item"><span>Bank (+8%)</span><button class="btn btn-gold" onclick="buyItem('bank', 500, 0.08)">500G</button></div>
-            <div class="shop-item"><span>Mint (+15%)</span><button class="btn btn-gold" onclick="buyItem('mint', 1200, 0.15)">1.2kG</button></div>
+        <div class="panel">
+            <h4 style="margin:0 0 8px 0; color:#1da1f2;">🏛️ Build & Decorate</h4>
+            <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                <span>🌾 Farm (+1%)</span><button class="shop-btn" onclick="buyItem('farm', 50, 0.01)">50G</button>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                <span>🏦 Bank (+5%)</span><button class="shop-btn" onclick="buyItem('bank', 300, 0.05)">300G</button>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                <span>🌳 Tree (Decor)</span><button class="shop-btn" onclick="buyItem('tree', 10, 0)">10G</button>
+            </div>
+        </div>
+        <div class="panel" style="border-color:#ffd700">
+            <h4 style="margin:0; font-size:12px; text-align:center;">🏆 Global Rankings</h4>
+            <div id="leaderboard-list" style="font-size: 11px; margin-top:5px;"></div>
         </div>
     </div>
-
     <div id="game-container"></div>
     <script src="game.js"></script>
 </body>
