@@ -5,16 +5,45 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Loot & Ledger | Village Treasurer</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser-arcade-physics.min.js"></script>
-    <link rel="stylesheet" href="style.css">
+    <style>
+        body { margin: 0; background: #1a1a1a; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; }
+        #ui { position: absolute; top: 20px; left: 20px; z-index: 10; pointer-events: none; width: 100%; }
+        .stat-card { background: rgba(0,0,0,0.8); padding: 15px; border-radius: 10px; border: 2px solid #ffd700; display: inline-block; pointer-events: auto; }
+        .gold-txt { color: #ffd700; font-size: 28px; font-weight: bold; }
+        #event-log { margin-top: 15px; background: rgba(0,0,0,0.6); padding: 10px; border-left: 4px solid #00ff00; width: 300px; font-size: 14px; }
+        button { pointer-events: auto; cursor: pointer; border: none; border-radius: 5px; transition: 0.3s; }
+        #buy-farm { background: #4caf50; color: white; padding: 10px; margin-top: 10px; }
+        #buy-farm:hover { background: #45a049; }
+        
+        /* Milestone Overlay */
+        #milestone-screen {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); z-index: 100; text-align: center;
+            flex-direction: column; justify-content: center; align-items: center;
+        }
+        .highlight { color: #ffd700; font-size: 3rem; margin-bottom: 10px; }
+    </style>
 </head>
 <body>
-    <div id="ui-layer">
-        <h1>Loot & Ledger</h1>
-        <div class="stat-box">
-            Gold: <span id="gold-count">100</span>
+
+    <div id="ui">
+        <div class="stat-card">
+            <div>Treasury: <span class="gold-txt" id="gold-display">100</span>G</div>
+            <div style="font-size: 12px; opacity: 0.8;">Interest Rate: <span id="rate-display">5</span>%</div>
+            <button id="buy-farm">Build Farm (Cost: 50G)</button>
+        </div>
+        <div id="event-log">Village is stable...</div>
+    </div>
+
+    <div id="milestone-screen">
+        <h1 class="highlight">🏆 GOAL REACHED!</h1>
+        <p>You have saved 1,000 Gold and earned the title: <strong>Junior Treasurer</strong></p>
+        <div style="margin: 30px;">
+            <button onclick="closeMilestone()" style="padding: 15px 30px; background: #ffd700; color: black; font-weight: bold;">Continue Journey</button>
+            <button id="share-btn" style="padding: 15px 30px; background: #1da1f2; color: white; margin-left: 10px;">Share Success 🚀</button>
         </div>
     </div>
-    
+
     <div id="game-container"></div>
 
     <script src="game.js"></script>
