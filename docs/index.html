@@ -2,56 +2,104 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Loot & Ledger | Empire Builder</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loot & Ledger: Infinite Empire</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser-arcade-physics.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { margin: 0; background: #1a1a1a; color: white; font-family: sans-serif; overflow: hidden; touch-action: none; }
-        #auth-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .auth-card { background: #2d2d2d; padding: 30px; border-radius: 15px; border: 2px solid #ffd700; text-align: center; }
-        input { display: block; width: 250px; padding: 10px; margin: 10px 0; border-radius: 5px; border: none; background: #444; color: white; }
-        .btn { padding: 10px 15px; cursor: pointer; border-radius: 8px; border: none; font-weight: bold; }
-        #ui { position: absolute; top: 10px; left: 10px; z-index: 10; pointer-events: none; display: flex; flex-direction: column; gap: 8px; }
-        .panel { background: rgba(0,0,0,0.8); padding: 12px; border-radius: 10px; pointer-events: auto; width: 230px; border: 1px solid #555; }
-        .shop-btn { background: #ffd700; color: black; padding: 5px; font-size: 11px; border-radius: 4px; border: none; font-weight: bold; cursor: pointer; }
-        #logout-btn { position: absolute; top: 10px; right: 10px; z-index: 100; pointer-events: auto; background: #ff4757; color: white; }
+        body { margin: 0; background: #1a1a1a; color: white; font-family: 'Segoe UI', Tahoma, sans-serif; overflow: hidden; transition: background 3s; }
+        
+        /* Overlays */
+        #auth-overlay, #guild-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        #crash-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,0,0,0.5); z-index: 900; display: none; align-items: center; justify-content: center; flex-direction: column; pointer-events: none; }
+        .card { background: #2d2d2d; padding: 30px; border-radius: 20px; border: 2px solid #ffd700; text-align: center; box-shadow: 0 0 20px rgba(255,215,0,0.2); }
+        
+        /* UI Panels */
+        #ui-layer { position: absolute; top: 10px; left: 10px; z-index: 10; pointer-events: none; display: flex; flex-direction: column; gap: 8px; }
+        .panel { background: rgba(0,0,0,0.85); padding: 12px; border-radius: 12px; border: 1px solid #444; pointer-events: auto; width: 240px; }
+        .btn { padding: 8px; cursor: pointer; border-radius: 6px; border: none; font-weight: bold; background: #ffd700; color: #000; width: 100%; margin-top: 5px; transition: 0.2s; }
+        .btn:hover { transform: scale(1.02); background: #fff; }
+        
+        /* Combat UI */
+        #boss-ui { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); width: 350px; text-align: center; display: none; z-index: 50; }
+        #boss-bar { background: #222; height: 15px; border-radius: 10px; border: 1px solid #fff; overflow: hidden; }
+        #boss-fill { background: #ff4757; height: 100%; width: 100%; transition: width 0.2s; }
+
+        /* Chat */
+        #chat-container { position: absolute; bottom: 10px; left: 10px; width: 280px; height: 180px; background: rgba(0,0,0,0.9); border-radius: 10px; border: 1px solid #1da1f2; display: flex; flex-direction: column; z-index: 20; }
+        #chat-messages { flex: 1; overflow-y: auto; padding: 8px; font-size: 11px; color: #eee; }
+        #chat-input { background: #222; border: none; color: white; padding: 8px; width: 100%; box-sizing: border-box; border-radius: 0 0 10px 10px; border-top: 1px solid #333; }
+
+        input { display: block; width: 250px; padding: 10px; margin: 10px 0; border-radius: 8px; border: none; background: #444; color: white; }
+        #achievement-box { position: fixed; bottom: 20px; right: 20px; background: #ffd700; color: #000; padding: 15px; border-radius: 10px; font-weight: bold; display: none; z-index: 2000; }
     </style>
 </head>
 <body>
+
     <div id="auth-overlay">
-        <div class="auth-card">
-            <h1 style="color:#ffd700">Loot & Ledger</h1>
+        <div class="card">
+            <h1 style="color:#ffd700; margin:0;">LOOT & LEDGER</h1>
+            <p style="font-size:12px; opacity:0.7;">Multiplayer Empire Builder</p>
             <input type="text" id="username" placeholder="Ruler Name">
             <input type="email" id="email" placeholder="Email">
             <input type="password" id="password" placeholder="Password">
-            <button class="btn" style="background:#ffd700" onclick="handleAuth('signup')">Found Empire</button>
-            <button class="btn" style="background:white; margin-top:5px" onclick="handleAuth('login')">Login</button>
+            <button class="btn" onclick="handleAuth('signup')">Found New Empire</button>
+            <button class="btn" onclick="handleAuth('login')" style="background:white; margin-top:8px">Login to Realm</button>
         </div>
     </div>
-    <button id="logout-btn" class="btn" style="display:none;" onclick="handleLogout()">Logout</button>
-    <div id="ui">
-        <div class="panel" style="border-color:#00ff00">
-            <div style="font-size: 20px;">Gold: <span id="gold-display" style="color:#ffd700">0</span></div>
-            <div style="font-size: 12px; opacity:0.7;">Interest: <span id="rate-display">5</span>%</div>
-            <p style="font-size: 10px; margin: 5px 0 0 0;">Tap screen to mine +1G!</p>
+
+    <div id="guild-overlay" style="display:none;">
+        <div class="card">
+            <h2 style="color:#a55eea">Join a Guild</h2>
+            <p style="font-size:12px;">Collaborate with others to raid enemies.</p>
+            <input type="text" id="guild-name-input" placeholder="Guild Name">
+            <button class="btn" style="background:#a55eea; color:white;" onclick="joinGuild()">Confirm Guild</button>
         </div>
+    </div>
+
+    <div id="boss-ui">
+        <h3 style="color:#ff4757; margin:0; text-shadow: 2px 2px #000;">🐲 WORLD BOSS: ANCIENT DRAGON</h3>
+        <div id="boss-bar"><div id="boss-fill"></div></div>
+    </div>
+
+    <div id="crash-overlay">
+        <h1 style="font-size: 40px; color: white;">⚠️ MARKET CRASH ⚠️</h1>
+        <h2 id="crash-clicks-ui">TAP RAPIDLY! Clicks: 15</h2>
+    </div>
+
+    <div id="achievement-box">🏆 ACHIEVEMENT: Empire Millionaire!</div>
+
+    <div id="ui-layer">
+        <div class="panel" style="border-left: 5px solid #00ff00;">
+            <div style="font-size: 18px;">Treasury: <b id="gold-display" style="color:#ffd700">100</b>G</div>
+            <div style="font-size: 11px; opacity:0.8;">Passive Rate: <span id="rate-display">5</span>%</div>
+        </div>
+
+        <div id="guild-panel" class="panel" style="display:none; border-left: 5px solid #a55eea;">
+            <h4 style="margin:0; color:#a55eea;">🛡️ <span id="guild-name-display">None</span></h4>
+            <div style="font-size: 11px; margin: 5px 0;">Guild Bank: <span id="guild-bank">0</span>G</div>
+            <button class="btn" style="background:#a55eea; color:white; font-size:10px;" onclick="donateToGuild()">Donate 100G</button>
+            <button id="raid-btn" class="btn" style="background:#ff4757; color:white; display:none;" onclick="triggerWar()">⚔️ RAID ENEMY</button>
+        </div>
+
         <div class="panel">
-            <h4 style="margin:0 0 8px 0; color:#1da1f2;">🏛️ Build & Decorate</h4>
-            <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                <span>🌾 Farm (+1%)</span><button class="shop-btn" onclick="buyItem('farm', 50, 0.01)">50G</button>
-            </div>
-            <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                <span>🏦 Bank (+5%)</span><button class="shop-btn" onclick="buyItem('bank', 300, 0.05)">300G</button>
-            </div>
-            <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                <span>🌳 Tree (Decor)</span><button class="shop-btn" onclick="buyItem('tree', 10, 0)">10G</button>
-            </div>
+            <h4 style="margin:0 0 8px 0;">🏛️ Construction</h4>
+            <button class="btn" onclick="buyItem('farm', 50, 0.01)">🌾 Farm (50G) +1%</button>
+            <button class="btn" onclick="buyItem('bank', 500, 0.08)">🏦 Bank (500G) +8%</button>
+            <button class="btn" style="background:#00ffcc" onclick="castGoldRain()">✨ Gold Rain (500G)</button>
         </div>
-        <div class="panel" style="border-color:#ffd700">
-            <h4 style="margin:0; font-size:12px; text-align:center;">🏆 Global Rankings</h4>
-            <div id="leaderboard-list" style="font-size: 11px; margin-top:5px;"></div>
+
+        <div class="panel" style="border-left: 5px solid #ffd700;">
+            <h4 style="margin:0; font-size:12px;">🏆 Rankings</h4>
+            <div id="leaderboard-list" style="font-size: 10px; margin-top:5px;"></div>
         </div>
     </div>
+
+    <div id="chat-container">
+        <div id="chat-messages">Global chat connected...</div>
+        <input type="text" id="chat-input" placeholder="Say something to the world...">
+    </div>
+
     <div id="game-container"></div>
     <script src="game.js"></script>
 </body>
