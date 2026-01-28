@@ -7,120 +7,70 @@
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser-arcade-physics.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --gold: #ffd700; --xp: #3498db; --bg: #0f0f0f; --panel: rgba(20, 20, 20, 0.95); }
-        body { margin: 0; background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; transition: background 3s ease; touch-action: manipulation; }
+        :root { --gold: #ffd700; --xp: #3498db; --bg: #0f0f0f; --panel: rgba(20, 20, 20, 0.9); }
+        body { margin: 0; background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
         
-        /* Overlays */
-        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 9000; display: flex; align-items: center; justify-content: center; }
-        #crash-overlay { position: fixed; inset: 0; background: rgba(255,0,0,0.6); z-index: 8000; display: none; align-items: center; justify-content: center; flex-direction: column; pointer-events: none; }
-        .card { background: #1a1a1a; padding: 25px; border-radius: 20px; border: 1px solid var(--gold); text-align: center; width: 280px; pointer-events: auto; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        /* FIX: Phaser Canvas Layering */
+        #game-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: auto; }
+        canvas { display: block; }
+
+        /* UI Layer: z-index 10 ensures buttons are on top */
+        #ui-layer { position: relative; z-index: 10; pointer-events: none; height: 100vh; }
+        .glass-panel { background: var(--panel); padding: 12px; border-radius: 12px; border: 1px solid #333; pointer-events: auto; backdrop-filter: blur(8px); margin-bottom: 8px; }
         
-        /* News Ticker */
-        #news-ticker { position: fixed; top: 0; left: 0; width: 100%; background: rgba(0,0,0,0.8); border-bottom: 1px solid var(--gold); color: var(--gold); padding: 6px 0; font-size: 11px; z-index: 5000; overflow: hidden; }
-        #news-content { display: inline-block; padding-left: 100%; animation: scroll-news 20s linear infinite; white-space: nowrap; font-weight: bold; }
-        .announcement-flash { animation: gold-flash 2s ease-in-out 3; }
-        @keyframes gold-flash { 0%, 100% { background: rgba(0,0,0,0.8); } 50% { background: var(--gold); color: black; } }
+        #hud { position: absolute; top: 50px; left: 10px; width: 240px; }
+        #news-ticker { position: fixed; top: 0; width: 100%; background: rgba(0,0,0,0.8); border-bottom: 1px solid var(--gold); color: var(--gold); padding: 6px; z-index: 100; text-align: center; font-size: 12px; font-weight: bold; }
+        
+        .btn { padding: 10px; cursor: pointer; border-radius: 8px; border: none; font-weight: bold; background: var(--gold); color: black; width: 100%; margin-top: 5px; pointer-events: auto; }
+        input { display: block; width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; background: #000; color: white; border: 1px solid #444; box-sizing: border-box; }
 
-        /* HUD Panels */
-        #hud { position: absolute; top: 45px; left: 10px; z-index: 100; pointer-events: none; width: 240px; display: flex; flex-direction: column; gap: 6px; }
-        .glass-panel { background: var(--panel); padding: 10px; border-radius: 12px; border: 1px solid #333; pointer-events: auto; backdrop-filter: blur(8px); }
-        .bar-bg { background: #222; height: 8px; border-radius: 4px; margin-top: 4px; overflow: hidden; }
-        #xp-fill { background: var(--xp); width: 0%; height: 100%; transition: width 0.4s; }
+        #chat-box { position: absolute; bottom: 10px; left: 10px; right: 10px; height: 150px; display: flex; flex-direction: column; pointer-events: auto; }
+        #messages { flex: 1; overflow-y: auto; background: var(--panel); padding: 8px; font-size: 12px; border-radius: 12px 12px 0 0; }
+        #chat-input { background: #000; border: 1px solid #333; color: white; padding: 12px; border-radius: 0 0 12px 12px; outline: none; }
 
-        /* Buttons & Inputs */
-        .btn { padding: 10px; cursor: pointer; border-radius: 8px; border: none; font-weight: bold; background: var(--gold); color: black; width: 100%; margin-top: 5px; font-size: 12px; transition: 0.2s; }
-        .btn:active { transform: scale(0.95); }
-        .btn:disabled { opacity: 0.4; filter: grayscale(1); }
-        input { display: block; width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; background: #111; color: white; border: 1px solid #444; box-sizing: border-box; }
-
-        /* Combat UI */
-        #boss-ui { position: fixed; top: 40px; left: 50%; transform: translateX(-50%); width: 220px; text-align: center; display: none; z-index: 100; }
-        #boss-bar { background: #222; height: 10px; border-radius: 5px; border: 1px solid white; overflow: hidden; }
-        #boss-fill { background: #ff4757; height: 100%; width: 100%; transition: width 0.2s; }
-
-        /* Chat System */
-        #chat-box { position: absolute; bottom: 10px; left: 10px; right: 10px; height: 140px; background: var(--panel); border-radius: 12px; border: 1px solid #333; display: flex; flex-direction: column; z-index: 50; }
-        #messages { flex: 1; overflow-y: auto; padding: 8px; font-size: 11px; color: #ccc; }
-        #chat-input { background: #000; border: none; color: white; padding: 12px; border-top: 1px solid #333; outline: none; }
-
-        /* Village Info */
-        #village-count { position: absolute; bottom: 155px; right: 15px; font-size: 10px; color: var(--gold); background: rgba(0,0,0,0.5); padding: 4px 8px; border-radius: 5px; z-index: 10; pointer-events: none; }
-
-        /* FX */
-        @keyframes shake { 0% { transform: translate(2px, 2px); } 50% { transform: translate(-3px, -2px); } 100% { transform: translate(2px, 2px); } }
-        .shake-active { animation: shake 0.1s infinite; }
-        @keyframes scroll-news { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
-        .demolish-active #game-container { filter: sepia(0.5) hue-rotate(-50deg); }
-        #save-toast { position: fixed; bottom: 160px; right: 20px; background: #00ffcc; color: black; padding: 8px 15px; border-radius: 20px; font-weight: bold; display: none; z-index: 3000; }
+        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 9000; display: flex; align-items: center; justify-content: center; pointer-events: auto; }
+        .card { background: #1a1a1a; padding: 25px; border-radius: 20px; border: 1px solid var(--gold); text-align: center; width: 280px; }
+        
+        #village-count { position: absolute; bottom: 165px; right: 15px; font-size: 10px; color: var(--gold); background: rgba(0,0,0,0.5); padding: 4px 8px; border-radius: 5px; z-index: 10; }
     </style>
 </head>
 <body>
 
-    <audio id="siren-sound" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"></audio>
-    <audio id="boss-music" src="https://actions.google.com/sounds/v1/horror/ambient_hum_high_pitched.ogg" loop></audio>
-    <audio id="victory-sound" src="https://actions.google.com/sounds/v1/cartoon/clime_up_the_stairs.ogg"></audio>
-    <audio id="build-sound" src="https://actions.google.com/sounds/v1/tools/hammering_nails.ogg"></audio>
-
-    <div id="news-ticker"><div id="news-content">Welcome Ruler! Defend your treasury and build your legacy.</div></div>
+    <div id="news-ticker"><div id="news-content">Welcome to the Realm. Build your legacy.</div></div>
 
     <div id="auth-screen" class="overlay">
         <div class="card">
             <h1 style="color:var(--gold)">LOOT & LEDGER</h1>
-            <input type="text" id="username" placeholder="Empire Name">
-            <input type="email" id="email" placeholder="Email">
-            <input type="password" id="pw" placeholder="Password">
-            <button class="btn" onclick="handleAuth('signup')">New Game</button>
-            <button class="btn" onclick="handleAuth('login')" style="background:white; margin-top:8px">Login</button>
+            <p style="font-size: 12px; opacity: 0.7;">Choose a Realm Name to begin instantly.</p>
+            <input type="text" id="username" placeholder="Realm Name (e.g. Rome)">
+            <button class="btn" onclick="startGuestGame()">Enter Realm</button>
         </div>
-    </div>
-
-    <div id="tutorial-overlay" class="overlay" style="display:none;">
-        <div class="card" style="background:#2c2111; color:#f0e68c; border: 2px solid var(--gold);">
-            <h3>📜 ROYAL DECREE</h3>
-            <p style="text-align:left; font-size:12px;">
-                • TAP sky for Gold.<br>
-                • BUILD for passive income.<br>
-                • DEFEND during Market Crashes (Red Screen).<br>
-                • SLAY the Dragon for massive rewards.
-            </p>
-            <button class="btn" onclick="closeTutorial()">I UNDERSTAND</button>
-        </div>
-    </div>
-
-    <div id="leaderboard-overlay" class="overlay" style="display:none;">
-        <div class="card"><h2 style="color:var(--gold)">TOP RULERS</h2><div id="leaderboard-list"></div><button class="btn" onclick="toggleLeaderboard()" style="background:#444; color:white;">Close</button></div>
-    </div>
-
-    <div id="hud">
-        <div class="glass-panel">
-            <div style="font-size:11px">Level <span id="lvl">1</span> | Kills: <span id="stat-kills">0</span></div>
-            <div class="bar-bg"><div id="xp-fill"></div></div>
-            <div style="font-size: 18px; margin-top:5px;">Gold: <b id="gold">0</b></div>
-        </div>
-        <div class="glass-panel">
-            <button class="btn" onclick="buyItem('farm', 50, 0.01, 15)">🌾 Farm (50G)</button>
-            <button id="bank-btn" class="btn" onclick="buyItem('bank', 500, 0.08, 60)">🏦 Bank (500G)</button>
-            <button id="demolish-btn" class="btn" style="background:#ff4757; color:white;" onclick="toggleDemolish()">🔨 Demolish: OFF</button>
-            <button class="btn" onclick="toggleLeaderboard()" style="background:#576571; color:white;">🏆 Leaderboard</button>
-            <button class="btn" onclick="claimDaily()">🎁 Daily Bonus</button>
-        </div>
-    </div>
-
-    <div id="boss-ui">
-        <h4 style="margin:0; color:#ff4757;">🐲 WORLD BOSS</h4>
-        <div id="boss-bar"><div id="boss-fill"></div></div>
-    </div>
-
-    <div id="village-count">Structures: <span id="b-total">0</span></div>
-    <div id="crash-overlay"><h1 style="color:white;">⚠️ CRASH!</h1><h3 id="crash-clicks-ui" style="color:white;">TAP FAST!</h3></div>
-    <div id="save-toast">☁️ Cloud Synced</div>
-
-    <div id="chat-box">
-        <div id="messages"></div>
-        <input type="text" id="chat-input" placeholder="Message or /trade [user] [amt]">
     </div>
 
     <div id="game-container"></div>
+
+    <div id="ui-layer">
+        <div id="hud">
+            <div class="glass-panel">
+                <div style="font-size:11px">Level <span id="lvl">1</span> Ruler</div>
+                <div style="font-size: 18px; margin: 4px 0;">Gold: <b id="gold">0</b></div>
+            </div>
+            <div class="glass-panel">
+                <button class="btn" onclick="buyItem('farm', 50, 0.01, 15)">🌾 Farm (50G)</button>
+                <button class="btn" onclick="buyItem('bank', 500, 0.08, 60)">🏦 Bank (500G)</button>
+                <button id="demolish-btn" class="btn" style="background:#ff4757; color:white;" onclick="toggleDemolish()">🔨 Demolish: OFF</button>
+                <button class="btn" onclick="claimDaily()" style="background:#00ffcc; color:black;">🎁 Daily Bonus</button>
+            </div>
+        </div>
+
+        <div id="village-count">Structures: <span id="b-total">0</span></div>
+
+        <div id="chat-box">
+            <div id="messages"></div>
+            <input type="text" id="chat-input" placeholder="Chat or /trade [name] [amt]">
+        </div>
+    </div>
+
     <script src="game.js"></script>
 </body>
 </html>
