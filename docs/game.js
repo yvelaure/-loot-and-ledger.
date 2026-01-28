@@ -3,21 +3,20 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
 let gold = 100, xp = 0, level = 1, interest = 0.05, userId = null, currentUsername = "";
-let bossKills = 0, crashSaves = 0, lastRank = 99, sceneRef = null, bossSprite = null, bossHealth = 1000;
-let isCrashActive = false, crashClicks = 0, lastDaily = 0;
+let buildings = [], bossKills = 0, crashSaves = 0, lastRank = 99, isDemolishMode = false;
+let sceneRef = null, bossSprite = null, bossHealth = 1000, isCrashActive = false, crashClicks = 0;
 const channel = _supabase.channel('global');
 
-// --- AUTH & INITIALIZATION ---
+// --- AUTH ---
 async function handleAuth(type) {
     const email = document.getElementById('email').value, pass = document.getElementById('pw').value, user = document.getElementById('username').value;
     try {
         const { data, error } = (type === 'signup') ? await _supabase.auth.signUp({email, password:pass}) : await _supabase.auth.signInWithPassword({email, password:pass});
         if (error) throw error;
         userId = data.user.id; currentUsername = user || "Ruler";
-        if (type === 'signup') localStorage.removeItem('tutorialCompleted');
         document.getElementById('auth-screen').style.display = 'none';
-        document.getElementById('guild-screen').style.display = 'flex';
         initRealtime(); loadData();
+        setTimeout(() => { if(!localStorage.getItem('tutorialDone')) document.getElementById('tutorial-overlay').style.display='flex'; }, 1000);
     } catch (e) { alert(e.message); }
 }
 
@@ -30,30 +29,60 @@ function initRealtime() {
     .subscribe();
 }
 
-// --- CORE LOOPS ---
-function updateUI() {
-    document.getElementById('gold').innerText = Math.floor(gold).toLocaleString();
-    document.getElementById('lvl').innerText = level;
-    document.getElementById('xp-fill').style.width = (xp / (level * 100) * 100) + "%";
-    document.getElementById('bank-btn').disabled = (level < 2);
-    document.getElementById('stat-kills').innerText = bossKills;
-    document.getElementById('stat-saves').innerText = crashSaves;
-    let n = level * 100; if(xp >= n) { xp -= n; level++; addMsg("Level Up", `You are now Level ${level}!`); }
+// --- GAME LOGIC ---
+function buyItem(name, cost, b, g) {
+    if (gold >= cost && !isDemolishMode) {
+        gold -= cost; interest += b; xp += g;
+        document.getElementById('build-sound').play().catch(()=>{});
+        const x = Math.random() * (window.innerWidth - 60) + 30;
+        const y = Math.random() * (window.innerHeight / 3) + (window.innerHeight / 1.8);
+        const icon = (name === 'farm') ? '🌾' : '🏦';
+        placeBuildingSprite(x, y, icon);
+        buildings.push({ x, y, icon });
+        updateUI(); saveToCloud();
+    }
 }
 
-function buyItem(name, cost, b, g) {
-    if (gold >= cost) { gold -= cost; interest += b; xp += g; if(sceneRef) sceneRef.add.text(Math.random()*600, Math.random()*400+100, (name==='farm'?'🌾':'🏦'), {fontSize:'40px'}); updateUI(); saveToCloud(); }
+function placeBuildingSprite(x, y, icon) {
+    if(!sceneRef) return;
+    const bSprite = sceneRef.add.text(x, y, icon, { fontSize: '32px' }).setOrigin(0.5).setInteractive();
+    bSprite.setScale(0);
+    sceneRef.tweens.add({ targets: bSprite, scale: 1, duration: 400, ease: 'Back.easeOut' });
+
+    bSprite.on('pointerdown', () => {
+        if (isDemolishMode) {
+            const index = buildings.findIndex(b => b.x === x && b.y === y);
+            if (index > -1) buildings.splice(index, 1);
+            interest -= (icon === '🌾') ? 0.01 : 0.08;
+            gold += (icon === '🌾') ? 25 : 250;
+            bSprite.destroy();
+            updateUI(); saveToCloud();
+        }
+    });
+}
+
+function toggleDemolish() {
+    isDemolishMode = !isDemolishMode;
+    document.body.classList.toggle('demolish-active', isDemolishMode);
+    document.getElementById('demolish-btn').innerText = isDemolishMode ? "🛑 STOP" : "🔨 Demolish: OFF";
 }
 
 function claimDaily() {
-    const now = Date.now();
-    if (now - lastDaily > 86400000) { gold += 250; xp += 50; lastDaily = now; updateUI(); addMsg("System", "250G Daily Bonus Claimed!"); }
-    else alert("Daily bonus resets every 24 hours.");
+    gold += 250; xp += 50; updateUI(); addMsg("System", "Claimed 250G Bonus!");
+}
+
+function updateUI() {
+    document.getElementById('gold').innerText = Math.floor(gold).toLocaleString();
+    document.getElementById('lvl').innerText = level;
+    document.getElementById('stat-kills').innerText = bossKills;
+    document.getElementById('b-total').innerText = buildings.length;
+    document.getElementById('xp-fill').style.width = (xp / (level * 100) * 100) + "%";
+    if(xp >= level * 100) { xp = 0; level++; addMsg("LEVEL UP", `Rank ${level} achieved!`); }
 }
 
 // --- WORLD EVENTS ---
 function spawnBoss() {
-    if (bossSprite || !sceneRef) return;
+    if (bossSprite) return;
     bossHealth = 1000; document.getElementById('boss-ui').style.display = 'block';
     document.getElementById('boss-music').play().catch(()=>{});
     bossSprite = sceneRef.add.text(window.innerWidth/2, window.innerHeight/2, '🐲', {fontSize:'140px'}).setOrigin(0.5).setInteractive();
@@ -65,45 +94,36 @@ function syncBoss(hp) {
     if (bossHealth <= 0 && bossSprite) {
         bossSprite.destroy(); bossSprite = null; document.getElementById('boss-ui').style.display = 'none';
         document.getElementById('boss-music').pause(); document.getElementById('victory-sound').play().catch(()=>{});
-        gold += 1000; bossKills++; updateUI(); addMsg("VICTORY", "Dragon Slain! +1000 Gold!");
+        gold += 1000; bossKills++; updateUI();
     }
 }
 
 function startCrash() {
     if (isCrashActive) return;
     isCrashActive = true; crashClicks = 0; document.getElementById('crash-overlay').style.display = 'flex';
-    document.body.classList.add('shake-active'); document.getElementById('siren-sound').play().catch(()=>{});
+    document.getElementById('siren-sound').play().catch(()=>{});
+    document.body.classList.add('shake-active');
     setTimeout(() => {
         document.body.classList.remove('shake-active'); document.getElementById('siren-sound').pause();
-        if (crashClicks < 15) { gold *= 0.8; addMsg("MARKET", "Economic Crash! Lost 20% gold."); } 
-        else { crashSaves++; addMsg("MARKET", "Safe! Treasury protected."); }
+        if (crashClicks < 15) { gold *= 0.8; addMsg("CRASH", "Market collapse! Lost 20% gold."); } 
+        else { crashSaves++; addMsg("CRASH", "Crisis averted!"); }
         isCrashActive = false; document.getElementById('crash-overlay').style.display = 'none'; updateUI();
     }, 5000);
 }
 
-// --- LEADERBOARD & ASCENSION ---
+// --- LEADERBOARD & RANK ---
 async function toggleLeaderboard() {
     const o = document.getElementById('leaderboard-overlay');
     o.style.display = (o.style.display === 'none') ? 'flex' : 'none';
     if(o.style.display === 'flex') {
         const { data } = await _supabase.from('profiles').select('username, gold, level').order('gold', { ascending: false }).limit(10);
-        document.getElementById('leaderboard-list').innerHTML = data.map((p,i)=>`<div style="padding:8px; border-bottom:1px solid #333;">${i+1}. <b>${p.username}</b> - ${Math.floor(p.gold).toLocaleString()}G (Lvl ${p.level})</div>`).join('');
+        document.getElementById('leaderboard-list').innerHTML = data.map((p,i)=>`<div style="padding:5px; border-bottom:1px solid #333;">${i+1}. ${p.username} - ${Math.floor(p.gold)}G</div>`).join('');
     }
-}
-
-async function checkRank() {
-    const { data } = await _supabase.from('profiles').select('id').order('gold', { ascending: false }).limit(3);
-    const myRank = data.findIndex(p => p.id === userId) + 1;
-    if (myRank > 0 && myRank < lastRank) {
-        const msg = `🏆 ASCENSION: ${currentUsername} just hit Rank #${myRank} in the World!`;
-        channel.send({type:'broadcast', event:'news', payload:{text: msg}});
-    }
-    lastRank = (myRank === 0) ? 99 : myRank;
 }
 
 function triggerNewsFlash(text) {
-    const t = document.getElementById('news-ticker'), c = document.getElementById('news-content');
-    c.innerText = text; t.classList.add('announcement-flash'); setTimeout(()=>t.classList.remove('announcement-flash'), 5000);
+    const ticker = document.getElementById('news-ticker'), content = document.getElementById('news-content');
+    content.innerText = text; ticker.classList.add('announcement-flash'); setTimeout(()=>ticker.classList.remove('announcement-flash'), 5000);
 }
 
 // --- ENGINE ---
@@ -112,43 +132,39 @@ const config = {
     scene: { create: function() { 
         sceneRef = this; 
         this.input.on('pointerdown', (p) => {
-            if(isCrashActive) { crashClicks++; document.getElementById('crash-clicks-ui').innerText = `TAP! ${15-crashClicks} left`; }
-            else if(userId && p.y > 150) { gold += 1; updateUI(); }
+            if(isCrashActive) crashClicks++;
+            else if(userId && p.y > 150 && !isDemolishMode) { gold += 1; updateUI(); }
         });
-        let isNight = true; 
-        setInterval(() => { isNight = !isNight; this.cameras.main.setBackgroundColor(isNight ? 0x1a1a2e : 0x87ceeb); document.body.style.backgroundColor = isNight ? "#1a1a2e" : "#87ceeb"; }, 60000);
+        setInterval(() => { this.cameras.main.setBackgroundColor(Math.random() > 0.5 ? 0x1a1a2e : 0x87ceeb); }, 60000);
     }}
 };
 new Phaser.Game(config);
 
 async function saveToCloud() {
-    if(userId) await _supabase.from('profiles').upsert({ id:userId, gold, xp, level, interest_rate:interest, boss_kills:bossKills, crash_saves:crashSaves, username:currentUsername });
+    if(userId) await _supabase.from('profiles').upsert({ id:userId, gold, xp, level, interest_rate:interest, buildings: JSON.stringify(buildings), boss_kills:bossKills, username:currentUsername });
     const t = document.getElementById('save-toast'); t.style.display='block'; setTimeout(()=>t.style.display='none',1000);
 }
 
 async function loadData() {
     const { data } = await _supabase.from('profiles').select('*').eq('id', userId).single();
-    if(data) { gold = data.gold; xp = data.xp; level = data.level; interest = data.interest_rate; bossKills = data.boss_kills || 0; crashSaves = data.crash_saves || 0; updateUI(); }
+    if(data) {
+        gold = data.gold; xp = data.xp; level = data.level; interest = data.interest_rate; bossKills = data.boss_kills || 0;
+        if(data.buildings) { buildings = JSON.parse(data.buildings); buildings.forEach(b => placeBuildingSprite(b.x, b.y, b.icon)); }
+        updateUI();
+    }
 }
 
-function joinGuild() { document.getElementById('guild-screen').style.display = 'none'; setTimeout(() => { if(!localStorage.getItem('tutorialCompleted')) document.getElementById('tutorial-overlay').style.display='flex'; }, 800); }
-function closeTutorial() { document.getElementById('tutorial-overlay').style.display='none'; localStorage.setItem('tutorialCompleted','true'); }
-
-function addMsg(u, m) { const b = document.getElementById('messages'); b.innerHTML += `<div><span style="color:var(--gold)">[${u}]</span> ${m}</div>`; b.scrollTop = b.scrollHeight; }
+function closeTutorial() { document.getElementById('tutorial-overlay').style.display='none'; localStorage.setItem('tutorialDone', 'true'); }
+function addMsg(u, m) { document.getElementById('messages').innerHTML += `<div><b>[${u}]</b> ${m}</div>`; document.getElementById('messages').scrollTop = 9999; }
 
 document.getElementById('chat-input').addEventListener('keypress', (e) => {
     if (e.key === 'Enter' && e.target.value) {
-        const val = e.target.value;
-        if (val.startsWith('/trade')) {
-            const parts = val.split(' ');
-            if (gold >= parseInt(parts[2])) {
-                gold -= parseInt(parts[2]); updateUI();
-                channel.send({type:'broadcast', event:'trade', payload:{from:currentUsername, to:parts[1], amt:parts[2]}});
-                addMsg("SYSTEM", `Sent ${parts[2]}G to ${parts[1]}`);
-            }
+        if(e.target.value.startsWith('/trade')) {
+            const p = e.target.value.split(' ');
+            if(gold >= p[2]) { gold -= p[2]; channel.send({type:'broadcast', event:'trade', payload:{from:currentUsername, to:p[1], amt:p[2]}}); addMsg("You", `Sent ${p[2]}G to ${p[1]}`); updateUI(); }
         } else {
-            channel.send({type:'broadcast', event:'chat', payload:{user:currentUsername, msg:val}});
-            addMsg("You", val);
+            channel.send({type:'broadcast', event:'chat', payload:{user:currentUsername, msg:e.target.value}});
+            addMsg("You", e.target.value);
         }
         e.target.value = "";
     }
@@ -156,6 +172,6 @@ document.getElementById('chat-input').addEventListener('keypress', (e) => {
 
 // --- TIMERS ---
 setInterval(() => { if(userId) { gold += (gold * interest); updateUI(); }}, 10000);
-setInterval(() => { if(userId) { saveToCloud(); checkRank(); }}, 30000);
+setInterval(() => { if(userId) saveToCloud(); }, 30000);
 setInterval(() => { if(userId && Math.random() > 0.8) startCrash(); }, 180000);
 setInterval(() => { if(userId && !bossSprite) { spawnBoss(); channel.send({type:'broadcast', event:'boss_spawn'}); }}, 600000);
